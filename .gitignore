@@ -4,3 +4,8 @@ out/
 build/
 next-env.d.ts
 *.tsbuildinfo
+
+# Environment variables (Resend API key, contact email, etc.) — never commit these
+.env
+.env.local
+.env.*.local
