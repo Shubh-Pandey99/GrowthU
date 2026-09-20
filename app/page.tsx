@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 const engine = [
   ["01", "Discover", "Understand your audience, competitors and positioning."],
@@ -32,13 +32,51 @@ export default function Home() {
   const [engineIndex, setEngineIndex] = useState(0);
   const [serviceIndex, setServiceIndex] = useState(0);
   const [stage, setStage] = useState("growing");
-  const [formNotice, setFormNotice] = useState(false);
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+  const submittingRef = useRef(false);
   useEffect(() => {
     const onScroll = () => document.documentElement.classList.toggle("has-scrolled", window.scrollY > 18);
     onScroll(); window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setFormNotice(true); };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submittingRef.current) return;
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const payload = {
+      name: formData.get("name"),
+      email: formData.get("email"),
+      brand: formData.get("organization"),
+      requirement: formData.get("need"),
+      message: formData.get("message"),
+      website: formData.get("website"), // honeypot, left empty by real visitors
+    };
+    submittingRef.current = true;
+    setStatus("submitting");
+    setErrorMessage("");
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null);
+      if (response.ok && result?.success) {
+        setStatus("success");
+        form.reset();
+      } else {
+        setStatus("error");
+        setErrorMessage(result?.error || "Something went wrong while sending your enquiry. Please try again.");
+      }
+    } catch {
+      setStatus("error");
+      setErrorMessage("Something went wrong while sending your enquiry. Please try again.");
+    } finally {
+      submittingRef.current = false;
+    }
+  };
   const closeMenu = () => setMenuOpen(false);
   const service = services[serviceIndex];
   return <main>
@@ -52,7 +90,7 @@ export default function Home() {
     <section className="hero" id="home"><div className="hero-orb"></div><div className="container hero-grid" id="main">
       <div className="hero-copy"><p className="kicker">Social media × content × growth</p><h1>Turn attention<br />into <i>growth.</i></h1><p className="lede">GrowthU builds content systems for brands that want more than likes — strategy, creative and consistent execution designed to move the business forward.</p><div className="button-row"><a className="button" href="#contact">Build My Growth System <Arrow /></a><a className="text-link" href="#engine">See how it works <span>↓</span></a></div></div>
       <aside className="growth-signal" aria-label="Growth signal: Content, attention, engagement, trust, growth"><p className="panel-label">Live growth signal</p>{["Content", "Attention", "Engagement", "Trust", "Growth"].map((item, index) => <div className="signal" key={item}><span>0{index + 1}</span><strong>{item}</strong>{index < 4 && <i>↓</i>}</div>)}<p className="signal-note">A considered system, not a content lottery.</p></aside>
-    </div><div className="hero-rule container"><span>Scroll to discover</span><i></i><span>Strategy · Content · Growth</span></div></section>
+    </div><div className="hero-rule container"><span className="scroll-cue">Scroll to discover<i className="scroll-arrow" aria-hidden="true">↓</i></span><i className="rule-line" aria-hidden="true"></i><span>Strategy · Content · Growth</span></div></section>
 
     <section className="section engine" id="engine"><div className="container"><div className="section-heading engine-head"><div><p className="kicker">01 — The Growth Engine</p><h2>Not just posts.<br /><i>A growth system.</i></h2></div><p>Every piece of content has a job. Together, they make a cycle that gets more intelligent as it moves.</p></div>
       <div className="engine-layout"><div className="engine-path" role="tablist" aria-label="Growth engine stages">{engine.map(([num, title], index) => <button role="tab" aria-selected={engineIndex === index} className={engineIndex === index ? "active" : ""} onClick={() => setEngineIndex(index)} key={title}><span>{num}</span><b>{title}</b><i>{index === engine.length - 1 ? "↺" : "↓"}</i></button>)}</div><article className="engine-detail"><p className="kicker">Stage {engine[engineIndex][0]}</p><div className="detail-number">{engine[engineIndex][0]}</div><h3>{engine[engineIndex][1]}</h3><p>{engine[engineIndex][2]}</p><div className="engine-progress"><span style={{ width: `${((engineIndex + 1) / engine.length) * 100}%` }}></span></div><small>Growth is a cycle. The line always leads back to discovery.</small></article></div></div></section>
@@ -74,7 +112,7 @@ export default function Home() {
 
     <section className="final-cta"><div className="container cta-shell"><div><p className="kicker">The next move</p><h2>Ready to grow<br />beyond <i>posting?</i></h2><p>Let&apos;s build a content system that actually moves your brand forward.</p><a className="button light-button" href="#contact">Start Your Growth Journey <Arrow /></a></div><div className="cta-loop" aria-hidden="true"><span>Strategy</span><i>→</i><span>Content</span><i>→</i><span>Growth</span><i>↺</i></div></div></section>
 
-    <section className="section contact" id="contact"><div className="container contact-grid"><div><p className="kicker">08 — Start the conversation</p><h2>Let&apos;s build<br />something that <i>grows.</i></h2><p className="contact-copy">Tell us a little about where you want to go. We&apos;ll make the right next step clear.</p><div className="contact-mark"><strong>GrowthU</strong><span>Social Media Management Agency</span><em>Strategy · Content · Growth</em></div></div><form onSubmit={submit} aria-label="Contact GrowthU"><label>Name<input name="name" autoComplete="name" required /></label><label>Email<input name="email" type="email" autoComplete="email" required /></label><label>Brand<input name="organization" autoComplete="organization" required /></label><label>What do you need help with?<select name="need" defaultValue="" required><option value="" disabled>Select an area</option><option>Strategy</option><option>Content</option><option>Social media</option><option>Creative</option><option>Growth</option></select></label><label className="full">Message<textarea name="message" rows={4} required /></label>{formNotice && <p className="form-notice" role="status">Email delivery has not been configured yet, so this enquiry has not been sent. Connect this form to your preferred email or CRM provider to receive submissions.</p>}<button className="button form-submit" type="submit">Start the Conversation <Arrow /></button><p className="form-note">A transparent handoff: this form does not claim to send until a delivery provider is connected.</p></form></div></section>
+    <section className="section contact" id="contact"><div className="container contact-grid"><div><p className="kicker">08 — Start the conversation</p><h2>Let&apos;s build<br />something that <i>grows.</i></h2><p className="contact-copy">Tell us a little about where you want to go. We&apos;ll make the right next step clear.</p><div className="contact-mark"><strong>GrowthU</strong><span>Social Media Management Agency</span><em>Strategy · Content · Growth</em></div></div><form onSubmit={submit} aria-label="Contact GrowthU"><label className="hp-field" aria-hidden="true">Leave this field blank<input name="website" tabIndex={-1} autoComplete="off" /></label><label>Name<input name="name" autoComplete="name" required /></label><label>Email<input name="email" type="email" autoComplete="email" required /></label><label>Brand<input name="organization" autoComplete="organization" required /></label><label>What do you need help with?<select name="need" defaultValue="" required><option value="" disabled>Select an area</option><option>Strategy</option><option>Content</option><option>Social media</option><option>Creative</option><option>Growth</option></select></label><label className="full">Message<textarea name="message" rows={4} required /></label>{status === "success" && <p className="form-notice is-success" role="status">Thanks — your enquiry has been received. We&apos;ll be in touch soon.</p>}{status === "error" && <p className="form-notice is-error" role="alert">{errorMessage}</p>}<button className="button form-submit" type="submit" disabled={status === "submitting"}>{status === "submitting" ? "Sending..." : <>Start the Conversation <Arrow /></>}</button><p className="form-note">Your enquiry goes straight to our team — no forms lost, no fake confirmations.</p></form></div></section>
     <footer><div className="container"><a className="wordmark" href="#home">Growth<span>U</span></a><p>Strategy. Content. Growth.</p><p>© {new Date().getFullYear()} GrowthU</p></div></footer>
   </main>;
 }
